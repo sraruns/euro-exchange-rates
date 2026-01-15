@@ -9,9 +9,17 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "exchange_rates", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"base_currency", "target_currency", "date"})
-})
+@Table(
+    name = "exchange_rates",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"base_currency", "target_currency", "date"})
+    },
+    indexes = {
+        @Index(name = "idx_base_date", columnList = "base_currency,date"),
+        @Index(name = "idx_date", columnList = "date"),
+        @Index(name = "idx_base_target_date", columnList = "base_currency,target_currency,date")
+    }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

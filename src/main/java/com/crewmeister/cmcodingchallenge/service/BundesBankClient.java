@@ -1,11 +1,17 @@
 package com.crewmeister.cmcodingchallenge.service;
 
 import com.crewmeister.cmcodingchallenge.exception.BundesBankApiException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Duration;
@@ -53,28 +59,65 @@ public class BundesBankClient {
         return executeGet(path);
     }
 
+    @Retryable(
+        value = {WebClientResponseException.class, WebClientException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    @CircuitBreaker(name = "bundesbank", fallbackMethod = "fallback")
     private String executeGet(String path) {
         String fullUrl = baseUrl + path;
         log.info("Executing Bundesbank API request: {}", fullUrl);
         try {
-            return webClient.get()
+            ResponseEntity<String> response = webClient.get()
                 .uri(path)
                 .retrieve()
-//                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-//                    response -> response.bodyToMono(String.class)
-//                        .flatMap(body -> Mono.error(new BundesBankApiException(
-//                            "API error: " + response.statusCode() + " - " + body,
-//                            response.statusCode().value()))))
-                .bodyToMono(String.class)
+                .toEntity(String.class)
+                .doOnNext(resp -> logRateLimitHeaders(resp.getHeaders()))
                 .timeout(TIMEOUT)
                 .block();
+
+            return response != null ? response.getBody() : null;
         } catch (WebClientResponseException e) {
             log.error("Bundesbank API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw new BundesBankApiException("Failed to fetch data from Bundesbank API", e.getRawStatusCode(), e);
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                String retryAfter = e.getHeaders().getFirst("Retry-After");
+                throw new BundesBankApiException(
+                    "Rate limit exceeded. Retry after: " + retryAfter + " seconds",
+                    HttpStatus.TOO_MANY_REQUESTS.value(), e);
+            }
+            throw new BundesBankApiException(
+                "API error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString(),
+                e.getRawStatusCode(), e);
         } catch (Exception e) {
             log.error("Failed to fetch data from Bundesbank API", e);
             throw new BundesBankApiException("Failed to fetch data from Bundesbank API",
                 HttpStatus.SERVICE_UNAVAILABLE.value(), e);
         }
+    }
+
+    private void logRateLimitHeaders(HttpHeaders headers) {
+        String rateLimit = headers.getFirst("X-RateLimit-Limit");
+        String remaining = headers.getFirst("X-RateLimit-Remaining");
+        String reset = headers.getFirst("X-RateLimit-Reset");
+
+        if (remaining != null) {
+            log.info("Bundesbank API rate limit: {}/{}, resets at {}", remaining, rateLimit, reset);
+            try {
+                int remainingVal = Integer.parseInt(remaining);
+                if (remainingVal < 10) {
+                    log.warn("Approaching Bundesbank API rate limit! {} requests remaining", remaining);
+                }
+            } catch (NumberFormatException ignored) {
+                // Ignore parsing errors
+            }
+        }
+    }
+
+    private String fallback(String path, Exception e) {
+        log.error("Circuit breaker activated for Bundesbank API, path: {}", path, e);
+        throw new BundesBankApiException(
+            "External API temporarily unavailable. Please try again later.",
+            HttpStatus.SERVICE_UNAVAILABLE.value(), e);
     }
 }

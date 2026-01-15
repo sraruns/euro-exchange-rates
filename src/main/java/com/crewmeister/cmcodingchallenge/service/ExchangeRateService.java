@@ -5,14 +5,15 @@ import com.crewmeister.cmcodingchallenge.dto.ExchangeRatesHistoryResponse;
 import com.crewmeister.cmcodingchallenge.dto.ExchangeRatesOnDateResponse;
 import com.crewmeister.cmcodingchallenge.entity.Currency;
 import com.crewmeister.cmcodingchallenge.entity.ExchangeRate;
+import com.crewmeister.cmcodingchallenge.exception.CurrencyLoadException;
 import com.crewmeister.cmcodingchallenge.exception.ExchangeRateNotFoundException;
 import com.crewmeister.cmcodingchallenge.exception.InvalidCurrencyException;
 import com.crewmeister.cmcodingchallenge.repository.CurrencyRepository;
 import com.crewmeister.cmcodingchallenge.repository.ExchangeRateRepository;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +32,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ExchangeRateService {
 
     private static final String BASE_CURRENCY = "EUR";
@@ -42,15 +42,33 @@ public class ExchangeRateService {
     private final BundesBankParser parser;
     private final CurrencyRepository currencyRepository;
     private final ExchangeRateRepository exchangeRateRepository;
+    private final ExchangeRateMapper mapper;
+
+    @Value("${cache.history.ttl-minutes:60}")
+    private int cacheTtlMinutes;
+
+    @Value("${cache.history.max-size:100}")
+    private int cacheMaxSize;
 
     private Cache<String, ExchangeRatesHistoryResponse> historyCache;
     private volatile Set<String> validCurrencyCodes;
 
+    public ExchangeRateService(BundesBankClient client, BundesBankParser parser,
+                                CurrencyRepository currencyRepository,
+                                ExchangeRateRepository exchangeRateRepository,
+                                ExchangeRateMapper mapper) {
+        this.client = client;
+        this.parser = parser;
+        this.currencyRepository = currencyRepository;
+        this.exchangeRateRepository = exchangeRateRepository;
+        this.mapper = mapper;
+    }
+
     @PostConstruct
     public void init() {
         this.historyCache = Caffeine.newBuilder()
-                .expireAfterWrite(1, TimeUnit.HOURS)
-                .maximumSize(100)
+                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
+                .maximumSize(cacheMaxSize)
                 .build();
 
         loadCurrencies();
@@ -62,7 +80,7 @@ public class ExchangeRateService {
         List<Currency> currencies = currencyRepository.findAll();
         if (currencies.isEmpty()) {
             log.error("No currencies found in database");
-            throw new RuntimeException("Error loading currencies from the service");
+            throw new CurrencyLoadException("Currency list unavailable. Service may be initializing.");
         }
         return currencies;
     }
@@ -113,7 +131,7 @@ public class ExchangeRateService {
                 ? exchangeRateRepository.findByBaseCurrencyAndDateIn(BASE_CURRENCY, datesPage.getContent())
                 : Collections.emptyList();
 
-        ExchangeRatesHistoryResponse response = buildHistoryResponse(startDate, endDate, ratesForDates, datesPage);
+        ExchangeRatesHistoryResponse response = mapper.toHistoryResponse(BASE_CURRENCY, startDate, endDate, ratesForDates, datesPage);
         historyCache.put(cacheKey, response);
         return response;
     }
@@ -164,7 +182,7 @@ public class ExchangeRateService {
             }
         }
 
-        return getExchangeRatesOnDateResponse(date, rates, validTargetCurrency);
+        return mapper.toOnDateResponse(BASE_CURRENCY, date, rates);
     }
 
 
@@ -271,50 +289,5 @@ public class ExchangeRateService {
             throw new InvalidCurrencyException(currency);
         }
         return normalized;
-    }
-
-
-    private static ExchangeRatesHistoryResponse buildHistoryResponse(
-            LocalDate startDate, LocalDate endDate, List<ExchangeRate> rates, Page<LocalDate> datesPage) {
-        Map<String, Map<String, BigDecimal>> ratesMap = rates.stream()
-                .collect(Collectors.groupingBy(
-                        rate -> rate.getDate().toString(),
-                        TreeMap::new,
-                        Collectors.toMap(
-                                ExchangeRate::getTargetCurrency,
-                                ExchangeRate::getRate,
-                                (v1, v2) -> v1,
-                                TreeMap::new)));
-
-        return ExchangeRatesHistoryResponse.builder()
-                .startDate(startDate)
-                .endDate(endDate)
-                .baseCurrency(BASE_CURRENCY)
-                .rates(ratesMap)
-                .page(datesPage.getNumber())
-                .size(datesPage.getSize())
-                .totalElements(datesPage.getTotalElements())
-                .totalPages(datesPage.getTotalPages())
-                .build();
-    }
-
-    private static ExchangeRatesOnDateResponse getExchangeRatesOnDateResponse(LocalDate date, List<ExchangeRate> rates, String targetCurrency) {
-        Map<String, BigDecimal> ratesMap = rates.stream()
-                .collect(Collectors.toMap(
-                        ExchangeRate::getTargetCurrency,
-                        ExchangeRate::getRate,
-                        (v1, v2) -> v1,
-                        TreeMap::new));
-
-        String message = ratesMap.isEmpty()
-                ? "No rates available for this date. It may be a weekend or public holiday."
-                : null;
-
-        return ExchangeRatesOnDateResponse.builder()
-                .baseCurrency(BASE_CURRENCY)
-                .date(date)
-                .rates(ratesMap)
-                .message(message)
-                .build();
     }
 }

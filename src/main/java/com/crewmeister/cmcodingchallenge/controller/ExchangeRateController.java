@@ -5,6 +5,8 @@ import com.crewmeister.cmcodingchallenge.dto.ExchangeRatesHistoryResponse;
 import com.crewmeister.cmcodingchallenge.dto.ExchangeRatesOnDateResponse;
 import com.crewmeister.cmcodingchallenge.entity.Currency;
 import com.crewmeister.cmcodingchallenge.service.ExchangeRateService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -17,20 +19,23 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "Exchange Rates", description = "EUR-FX exchange rate operations")
 @Validated
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class ExchangeRateController {
 
     private final ExchangeRateService exchangeRateService;
 
+    @Operation(summary = "List all available currencies")
     @GetMapping("/currencies")
     public ResponseEntity<List<Currency>> getCurrencies() {
         return ResponseEntity.ok(exchangeRateService.getCurrencies());
     }
 
 
+    @Operation(summary = "Get paginated exchange rate history")
     @GetMapping("/exchange-rates/history")
     public ResponseEntity<ExchangeRatesHistoryResponse> getExchangeRatesHistory(
             @RequestParam(name = "currency", defaultValue = "EUR") String currency,
@@ -47,6 +52,7 @@ public class ExchangeRateController {
         return ResponseEntity.ok(exchangeRateService.getExchangeRatesHistory(currency, fromDate, endDate, page, size));
     }
 
+    @Operation(summary = "Get all exchange rates on a specific date")
     @GetMapping("/exchange-rates/{on_date}")
     public ResponseEntity<ExchangeRatesOnDateResponse> getExchangeRatesOnDate(
             @RequestParam(defaultValue = "EUR", name = "currency") String currency,
@@ -54,6 +60,7 @@ public class ExchangeRateController {
         return ResponseEntity.ok(exchangeRateService.getExchangeRatesOnDate(currency, onDate));
     }
 
+    @Operation(summary = "Convert amount between currencies on a date")
     @GetMapping("/convert-currency")
     public ResponseEntity<ConversionResult> convertCurrencyOnDate(
             @RequestParam("from_currency") @NotBlank String fromCurrency,

@@ -82,6 +82,3 @@ demo output.
 - Submit completed project via the Greenhouse link in the email received from the Recruitment Manager
 - Please send us a link to a github repo that with the solution and make sure that that the branch/repo is not private.
 - Please do not submit zipped files
-
-
-

@@ -59,6 +59,19 @@ public class GlobalExceptionHandler {
                 .build());
     }
 
+    @ExceptionHandler(CurrencyLoadException.class)
+    public ResponseEntity<ErrorResponse> handleCurrencyLoadError(
+            CurrencyLoadException ex, HttpServletRequest request) {
+        log.error("Currency load error: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ErrorResponse.builder()
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .error("Service Unavailable")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build());
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
