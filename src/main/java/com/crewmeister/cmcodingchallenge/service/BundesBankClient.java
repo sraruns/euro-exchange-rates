@@ -62,9 +62,9 @@ public class BundesBankClient {
     @Retryable(
         value = {WebClientResponseException.class, WebClientException.class},
         maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2)
+        backoff = @Backoff(delay = 1000, multiplier = 2, maxDelay = 10000)
     )
-    @CircuitBreaker(name = "bundesbank", fallbackMethod = "fallback")
+    @CircuitBreaker(name = "bundesbank")
     private String executeGet(String path) {
         String fullUrl = baseUrl + path;
         log.info("Executing Bundesbank API request: {}", fullUrl);
@@ -114,10 +114,4 @@ public class BundesBankClient {
         }
     }
 
-    private String fallback(String path, Exception e) {
-        log.error("Circuit breaker activated for Bundesbank API, path: {}", path, e);
-        throw new BundesBankApiException(
-            "External API temporarily unavailable. Please try again later.",
-            HttpStatus.SERVICE_UNAVAILABLE.value(), e);
-    }
 }

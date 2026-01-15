@@ -58,11 +58,45 @@ mvn test -Dtest=ExchangeRateServiceTest
 ```
 
 ## Tech Stack
-- Java 11, Spring Boot 2.4
+- Java 11, Spring Boot 2.7.18
 - H2 (file-based persistence)
 - Caffeine cache (1hr TTL)
 - WebClient for Bundesbank API
 - springdoc-openapi for Swagger
+
+## Prerequisites (per README.md requirements)
+- **Java**: 11 (compatible with OpenSDK 15)
+- **Maven**: 3.x
+- **Spring Boot**: 2.7.18
+
+## Docker Execution
+
+### Multi-stage Build
+The Dockerfile uses multi-stage build for smaller image:
+1. **Build stage**: `maven:3.8-openjdk-11-slim` - compiles the app
+2. **Runtime stage**: `eclipse-temurin:11-jre-alpine` - runs the JAR (~150MB)
+
+### Commands
+```bash
+# Using docker-compose (recommended)
+docker-compose up --build
+
+# Manual build & run
+docker build -t exchange-rate-service .
+docker run -p 8080:8080 -v ./data:/app/data exchange-rate-service
+
+# Detached mode
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+### Volume Mount
+- `./data:/app/data` - persists H2 database across container restarts
 
 ## Bundesbank SDMX API Flow
 

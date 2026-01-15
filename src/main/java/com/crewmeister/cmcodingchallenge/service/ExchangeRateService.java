@@ -12,6 +12,7 @@ import com.crewmeister.cmcodingchallenge.repository.CurrencyRepository;
 import com.crewmeister.cmcodingchallenge.repository.ExchangeRateRepository;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -32,11 +33,11 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ExchangeRateService {
 
     private static final String BASE_CURRENCY = "EUR";
     private static final LocalDate MIN_DATE = LocalDate.of(2020, 1, 1);
-    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final BundesBankClient client;
     private final BundesBankParser parser;
@@ -52,17 +53,6 @@ public class ExchangeRateService {
 
     private Cache<String, ExchangeRatesHistoryResponse> historyCache;
     private volatile Set<String> validCurrencyCodes;
-
-    public ExchangeRateService(BundesBankClient client, BundesBankParser parser,
-                                CurrencyRepository currencyRepository,
-                                ExchangeRateRepository exchangeRateRepository,
-                                ExchangeRateMapper mapper) {
-        this.client = client;
-        this.parser = parser;
-        this.currencyRepository = currencyRepository;
-        this.exchangeRateRepository = exchangeRateRepository;
-        this.mapper = mapper;
-    }
 
     @PostConstruct
     public void init() {
@@ -164,7 +154,7 @@ public class ExchangeRateService {
 
     @Transactional
     public ExchangeRatesOnDateResponse getExchangeRatesOnDate(String targetCurrency, LocalDate date) {
-        String validTargetCurrency = validateCurrency(targetCurrency);
+        validateCurrency(targetCurrency);
 
         List<ExchangeRate> dbRates = exchangeRateRepository.findByBaseCurrencyAndDate(BASE_CURRENCY, date);
 
