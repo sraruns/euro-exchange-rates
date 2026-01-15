@@ -29,6 +29,19 @@ public class GlobalExceptionHandler {
                 .build());
     }
 
+    @ExceptionHandler(InvalidCurrencyException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCurrency(
+            InvalidCurrencyException ex, HttpServletRequest request) {
+        log.warn("Invalid currency: {}", ex.getCurrency());
+        return ResponseEntity.badRequest()
+            .body(ErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Invalid Currency")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build());
+    }
+
     @ExceptionHandler(BundesBankApiException.class)
     public ResponseEntity<ErrorResponse> handleBundesBankApiError(
             BundesBankApiException ex, HttpServletRequest request) {

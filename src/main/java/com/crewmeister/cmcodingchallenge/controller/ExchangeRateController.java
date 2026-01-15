@@ -1,8 +1,9 @@
 package com.crewmeister.cmcodingchallenge.controller;
 
 import com.crewmeister.cmcodingchallenge.dto.ConversionResult;
+import com.crewmeister.cmcodingchallenge.dto.ExchangeRatesHistoryResponse;
+import com.crewmeister.cmcodingchallenge.dto.ExchangeRatesOnDateResponse;
 import com.crewmeister.cmcodingchallenge.entity.Currency;
-import com.crewmeister.cmcodingchallenge.entity.ExchangeRate;
 import com.crewmeister.cmcodingchallenge.service.ExchangeRateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -31,21 +32,23 @@ public class ExchangeRateController {
 
 
     @GetMapping("/exchange-rates/history")
-    public ResponseEntity<List<ExchangeRate>> getExchangeRatesHistory(
+    public ResponseEntity<ExchangeRatesHistoryResponse> getExchangeRatesHistory(
             @RequestParam(name = "currency", defaultValue = "EUR") String currency,
-            @RequestParam(name = "from_date", defaultValue = "2025-01-01")
+            @RequestParam(name = "from_date", defaultValue = "2020-01-01")
                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(name = "to_date", required = false)
-                        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+                        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         LocalDate endDate = (toDate != null) ? toDate : LocalDate.now();
         if (fromDate.isAfter(endDate)) {
             throw new IllegalArgumentException("from_date must be before or equal to toDate");
         }
-        return ResponseEntity.ok(exchangeRateService.getExchangeRates(currency, fromDate, endDate));
+        return ResponseEntity.ok(exchangeRateService.getExchangeRatesHistory(currency, fromDate, endDate, page, size));
     }
 
     @GetMapping("/exchange-rates/{on_date}")
-    public ResponseEntity<List<ExchangeRate>> getExchangeRatesOnDate(
+    public ResponseEntity<ExchangeRatesOnDateResponse> getExchangeRatesOnDate(
             @RequestParam(defaultValue = "EUR", name = "currency") String currency,
             @PathVariable(name = "on_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate onDate) {
         return ResponseEntity.ok(exchangeRateService.getExchangeRatesOnDate(currency, onDate));
@@ -56,8 +59,12 @@ public class ExchangeRateController {
             @RequestParam("from_currency") @NotBlank String fromCurrency,
             @RequestParam(name = "to_currency", defaultValue = "EUR") @NotBlank String toCurrency,
             @RequestParam(defaultValue = "1") @Positive BigDecimal amount,
-            @RequestParam(name = "on_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate onDate) {
-        return ResponseEntity.ok(exchangeRateService.convertCurrency(fromCurrency, toCurrency, amount, onDate));
+            @RequestParam(name = "on_date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate onDate) {
+        LocalDate date = (onDate != null) ? onDate : LocalDate.now();
+        if (date.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("on_date must be before or equal today");
+        }
+        return ResponseEntity.ok(exchangeRateService.convertCurrency(fromCurrency, toCurrency, amount, date));
     }
 
 }

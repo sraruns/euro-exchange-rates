@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 @Component
 public class BundesBankParser {
 
+    private static final String BASE_CURRENCY = "EUR";
     private final XmlMapper xmlMapper;
 
     public BundesBankParser() {
@@ -74,7 +75,7 @@ public class BundesBankParser {
         }
     }
 
-    private ExchangeRate parseObservation(ExchangeRateDataXml.ObservationXml obs, String currency) {
+    private ExchangeRate parseObservation(ExchangeRateDataXml.ObservationXml obs, String targetCurrency) {
         try {
             if (obs.getDimension() == null || obs.getObsValue() == null) return null;
 
@@ -84,12 +85,13 @@ public class BundesBankParser {
             if (date == null || value == null) return null;
 
             ExchangeRate rate = new ExchangeRate();
-            rate.setCurrency(currency);
+            rate.setBaseCurrency(BASE_CURRENCY);
+            rate.setTargetCurrency(targetCurrency);
             rate.setDate(LocalDate.parse(date));
             rate.setRate(new BigDecimal(value));
             return rate;
         } catch (Exception e) {
-            log.warn("Failed to parse observation for currency={}", currency);
+            log.warn("Failed to parse observation for targetCurrency={}", targetCurrency);
             return null;
         }
     }
