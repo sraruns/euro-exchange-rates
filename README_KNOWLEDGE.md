@@ -13,8 +13,8 @@ mvn spring-boot:run
 docker-compose up --build
 
 # Or manually
-docker build -t exchange-rate-service .
-docker run -p 8080:8080 -v ./data:/app/data exchange-rate-service
+docker build -t cm-coding-challenge .
+docker run -p 8080:8080 -v ./data:/app/data cm-coding-challenge
 ```
 
 ## Swagger UI
@@ -82,17 +82,9 @@ The Dockerfile uses multi-stage build for smaller image:
 docker-compose up --build
 
 # Manual build & run
-docker build -t exchange-rate-service .
-docker run -p 8080:8080 -v ./data:/app/data exchange-rate-service
+docker build -t cm-coding-challenge .
+docker run -p 8080:8080 -v ./data:/app/data cm-coding-challenge
 
-# Detached mode
-docker-compose up -d --build
-
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
 ```
 
 ### Volume Mount
