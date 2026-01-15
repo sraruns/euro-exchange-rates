@@ -1,5 +1,8 @@
 # Exchange Rate Service - Development Guide
 
+## Use the CrewMeister Collection.postman_collection.json for testing with Postman
+- CrewMeister Collection.postman_collection.json
+
 ## Quick Start
 
 ### Maven
